@@ -78,20 +78,25 @@ fi
 # refuses to load it with the vague "Service cannot load in requested
 # session".
 #
-# ⚠ 只调整本工具自己装进来的文件，**绝不** chown -R 整个 TOOLS_DIR。
-# /Library/PrivilegedHelperTools 由所有特权 helper 共享，里面可能有别的 App 装的、
-# 受 macOS 保护（com.apple.macl）的 bundle（例如 ChromeRemoteDesktopHost.app）。
-# 对那些文件 chown 会返回 "Operation not permitted"，在 set -euo pipefail 下直接
-# 中断脚本 —— 二进制已经拷进去了，但后面的 plist 安装与 launchctl bootstrap 全都
-# 没跑，表现成「脚本跑完了，helper 却仍然不可达」。
+# Touch only the files this tool installs. /Library/PrivilegedHelperTools is
+# shared by every privileged helper, and a bundle protected by
+# com.apple.macl (ChromeRemoteDesktopHost.app, for example) rejects chown
+# even for root. Under set -euo pipefail the script then aborts after
+# copying the binary but before it installs the plist and runs launchctl
+# bootstrap, so the install looks finished while the helper stays
+# unreachable.
+chown root:wheel "${TOOLS_DIR}"
 chmod 755 "${TOOLS_DIR}"
-chown -h root:wheel "${INSTALL_PATH}" "${TOOLS_DIR}"/libtetherkit*.dylib
+chown -h root:wheel "${INSTALL_PATH}"
+if compgen -G "${TOOLS_DIR}/libtethernet*.dylib" >/dev/null; then
+  chown -h root:wheel "${TOOLS_DIR}"/libtethernet*.dylib
+fi
 if compgen -G "${TOOLS_DIR}/libusb-*.dylib" >/dev/null; then
   chown -h root:wheel "${TOOLS_DIR}"/libusb-*.dylib
 fi
 chmod 544 "${INSTALL_PATH}"
 find "${TOOLS_DIR}" -maxdepth 1 -type f \
-  \( -name 'libtetherkit*.dylib' -o -name 'libusb-*.dylib' \) -exec chmod 444 {} +
+  \( -name 'libtethernet*.dylib' -o -name 'libusb-*.dylib' \) -exec chmod 444 {} +
 
 log "Installing ${PLIST_PATH}"
 cp "${SOURCE_DIR}/${LABEL}.plist" "${PLIST_PATH}"
