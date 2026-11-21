@@ -84,6 +84,16 @@ find "${TOOLS_DIR}" -maxdepth 1 -name '*.dylib' -type f -exec chmod 444 {} +
 
 log "Installing ${PLIST_PATH}"
 cp "${SOURCE_DIR}/${LABEL}.plist" "${PLIST_PATH}"
+
+# macOS 27 stops loading launchd plists that carry com.apple.quarantine
+# (release note 166415497; launchd logs error 155 "Refusing to execute/trust
+# quarantined program/file"). Extracting a downloaded zip stamps the attribute
+# on every file inside it, and cp preserves extended attributes, so the plist
+# arrives quarantined even when the app itself was opened via the Gatekeeper
+# prompt. Strip it from the installed copy only; when the attribute is absent
+# xattr exits non-zero and the guard keeps the script going.
+xattr -d com.apple.quarantine "${PLIST_PATH}" 2>/dev/null || true
+
 chown root:wheel "${PLIST_PATH}"
 chmod 644 "${PLIST_PATH}"
 
