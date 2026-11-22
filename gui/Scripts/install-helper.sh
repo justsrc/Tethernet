@@ -77,10 +77,26 @@ fi
 # and it must NOT be group- or other-writable. When that is violated, launchd
 # refuses to load it with the vague "Service cannot load in requested
 # session".
-chown -R root:wheel "${TOOLS_DIR}"
+#
+# Touch only the files this tool installs. /Library/PrivilegedHelperTools is
+# shared by every privileged helper, and a bundle protected by
+# com.apple.macl (ChromeRemoteDesktopHost.app, for example) rejects chown
+# even for root. Under set -euo pipefail the script then aborts after
+# copying the binary but before it installs the plist and runs launchctl
+# bootstrap, so the install looks finished while the helper stays
+# unreachable.
+chown root:wheel "${TOOLS_DIR}"
 chmod 755 "${TOOLS_DIR}"
+chown -h root:wheel "${INSTALL_PATH}"
+if compgen -G "${TOOLS_DIR}/libtethernet*.dylib" >/dev/null; then
+  chown -h root:wheel "${TOOLS_DIR}"/libtethernet*.dylib
+fi
+if compgen -G "${TOOLS_DIR}/libusb-*.dylib" >/dev/null; then
+  chown -h root:wheel "${TOOLS_DIR}"/libusb-*.dylib
+fi
 chmod 544 "${INSTALL_PATH}"
-find "${TOOLS_DIR}" -maxdepth 1 -name '*.dylib' -type f -exec chmod 444 {} +
+find "${TOOLS_DIR}" -maxdepth 1 -type f \
+  \( -name 'libtethernet*.dylib' -o -name 'libusb-*.dylib' \) -exec chmod 444 {} +
 
 log "Installing ${PLIST_PATH}"
 cp "${SOURCE_DIR}/${LABEL}.plist" "${PLIST_PATH}"
